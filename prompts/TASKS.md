@@ -27,3 +27,7 @@ Generate app: index-gpt5.html
 # v00.00.03
 1. [I] - Make sure neighboring colors are different. Use up to 10 colors if needed. - Completed: 2025-08-17 20:38:37
 1. [I] - Create 6 different color palettes. - Completed: 2025-08-17 20:38:37
+
+# v00.00.04
+1. [I] Whilst moving the dot, color the section black. When the mouse pointer is released to drop the dot, set it to one of the colors in the palette and apply the neighboring color algorithm. - Completed: 2025-08-17 20:50:17
+1. [I] Color the Delaunay lines white. - Completed: 2025-08-17 20:52:41
