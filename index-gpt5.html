@@ -156,9 +156,25 @@
         <div class="row">
           <label>Cell fill</label>
           <select id="fill-mode">
-            <option value="none">None</option>
+            <option value="distinct">Distinct (palette)</option>
             <option value="solid">Solid</option>
             <option value="by-index" selected>By Index</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Colors</h3>
+        <div class="row">
+          <label for="palette-select">Palette</label>
+          <select id="palette-select">
+            <option value="bright">Bright</option>
+            <option value="pastel">Pastel</option>
+            <option value="vivid">Vivid</option>
+            <option value="warm">Warm</option>
+            <option value="cool">Cool</option>
+            <option value="solarized">Solarized</option>
           </select>
         </div>
       </div>
@@ -199,6 +215,7 @@
       showDelaunay: false,
       fillMode: 'by-index',
       jitter: 0,
+      paletteName: 'bright',
     };
 
     // Canvas & sizing
@@ -296,6 +313,56 @@
       return { delaunay, voronoi };
     }
 
+    // Palettes (10 colors each)
+    const palettes = {
+      bright: ['#e6194b','#3cb44b','#ffe119','#0082c8','#f58231','#911eb4','#46f0f0','#f032e6','#d2f53c','#fabebe'],
+      pastel: ['#ffd1dc','#c1e1c1','#fff5ba','#cce0ff','#ffd8b1','#e6ccff','#d5f6f6','#f6c1ff','#eaffd0','#ffe3e3'],
+      vivid:  ['#ff1744','#00e676','#ffea00','#2979ff','#ff9100','#d500f9','#00e5ff','#76ff03','#f50057','#00b0ff'],
+      warm:   ['#b71c1c','#e65100','#f9a825','#6d4c41','#d84315','#8d6e63','#c62828','#ff7043','#ff8f00','#795548'],
+      cool:   ['#0d47a1','#00897b','#26a69a','#80cbc4','#5c6bc0','#1e88e5','#42a5f5','#90caf9','#00acc1','#4dd0e1'],
+      solarized: ['#b58900','#cb4b16','#dc322f','#d33682','#6c71c4','#268bd2','#2aa198','#859900','#657b83','#839496'],
+    };
+
+    function hexToRgba(hex, alpha) {
+      let h = hex.replace('#','');
+      if (h.length === 3) h = h.split('').map(c => c + c).join('');
+      const r = parseInt(h.slice(0,2), 16), g = parseInt(h.slice(2,4), 16), b = parseInt(h.slice(4,6), 16);
+      const a = Math.max(0, Math.min(1, alpha == null ? 1 : alpha));
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+
+    // DSATUR-style greedy coloring using up to 10 colors
+    function computeDistinctColoring(delaunay, numSites, palette) {
+      const paletteLen = Math.min(palette.length, 10);
+      const adj = new Array(numSites);
+      for (let i = 0; i < numSites; i++) adj[i] = new Set();
+      for (let i = 0; i < numSites; i++) {
+        for (const nb of delaunay.neighbors(i)) { adj[i].add(nb); adj[nb].add(i); }
+      }
+      const degree = adj.map(s => s.size);
+      const colors = new Array(numSites).fill(-1);
+      const neighborColors = new Array(numSites).fill(0).map(() => new Set());
+      const uncolored = new Set(Array.from({length: numSites}, (_, i) => i));
+      function pickVertex() {
+        let best = -1, bestSat = -1, bestDeg = -1;
+        for (const v of uncolored) {
+          const sat = neighborColors[v].size, deg = degree[v];
+          if (sat > bestSat || (sat === bestSat && deg > bestDeg)) { best = v; bestSat = sat; bestDeg = deg; }
+        }
+        return best;
+      }
+      while (uncolored.size) {
+        const v = pickVertex();
+        const used = neighborColors[v];
+        let cidx = -1;
+        for (let c = 0; c < paletteLen; c++) if (!used.has(c)) { cidx = c; break; }
+        if (cidx === -1) cidx = 0; // fallback if palette exhausted
+        colors[v] = cidx; uncolored.delete(v);
+        for (const nb of adj[v]) neighborColors[nb].add(cidx);
+      }
+      return colors;
+    }
+
     function draw() {
       const { width, height, dpr, cssWidth, cssHeight } = fitCanvas();
       ctx.save();
@@ -319,6 +386,13 @@
 
       // Cells (fills)
       if (state.showCells && state.fillMode !== 'none') {
+        let precomputedColorsIdx = null;
+        let precomputedPalette = null;
+        if (state.fillMode === 'distinct') {
+          precomputedPalette = palettes[state.paletteName] || palettes.bright;
+          if (!precomputedPalette || precomputedPalette.length === 0) precomputedPalette = palettes.bright;
+          precomputedColorsIdx = computeDistinctColoring(delaunay, state.points.length, precomputedPalette);
+        }
         for (let i = 0; i < state.points.length; i++) {
           const cell = voronoi.cellPolygon(i);
           if (!cell) continue;
@@ -331,6 +405,9 @@
           } else if (state.fillMode === 'by-index') {
             const hue = (i * 47) % 360;
             ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.20)`;
+          } else if (state.fillMode === 'distinct') {
+            const ci = precomputedColorsIdx[i] % precomputedPalette.length;
+            ctx.fillStyle = hexToRgba(precomputedPalette[ci], 0.8);
           }
           ctx.fill();
         }
@@ -476,6 +553,20 @@
     $('show-sites').addEventListener('change', (e) => { state.showSites = e.target.checked; draw(); });
     $('show-delaunay').addEventListener('change', (e) => { state.showDelaunay = e.target.checked; draw(); });
     $('fill-mode').addEventListener('change', (e) => { state.fillMode = e.target.value; draw(); });
+    const paletteSelect = document.getElementById('palette-select');
+    try { paletteSelect.value = (localStorage.getItem('voronoi-palette') || state.paletteName); } catch {}
+    state.paletteName = paletteSelect.value;
+    paletteSelect.addEventListener('change', () => {
+      state.paletteName = paletteSelect.value;
+      try { localStorage.setItem('voronoi-palette', state.paletteName); } catch {}
+      // If not in distinct mode, switch to it so the change is visible immediately
+      const fillModeEl = document.getElementById('fill-mode');
+      if (state.fillMode !== 'distinct') {
+        state.fillMode = 'distinct';
+        if (fillModeEl) fillModeEl.value = 'distinct';
+      }
+      draw();
+    });
 
     // Export / Import
     $('btn-export').addEventListener('click', () => {
