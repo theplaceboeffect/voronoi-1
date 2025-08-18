@@ -31,3 +31,4 @@ Generate app: index-gpt5.html
 # v00.00.04
 1. [X] Whilst moving the dot, color the section black. When the mouse pointer is released to drop the dot, set it to one of the colors in the palette and apply the neighboring color algorithm. - Completed: 2025-08-17 20:50:17
 1. [X] Color the Delaunay lines white. - Completed: 2025-08-17 20:52:41
+1. [I] The color should change to one from the palette as soon as the mouse button is lifted. - Completed: 2025-08-18 18:46:52

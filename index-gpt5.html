@@ -513,8 +513,8 @@
       state.points[draggingIndex] = { x: p.x + dragOffset.x, y: p.y + dragOffset.y };
       draw();
     });
-    canvas.addEventListener('pointerup', () => { draggingIndex = -1; });
-    canvas.addEventListener('pointerleave', () => { draggingIndex = -1; });
+    canvas.addEventListener('pointerup', () => { draggingIndex = -1; draw(); });
+    canvas.addEventListener('pointerleave', () => { draggingIndex = -1; draw(); });
 
     // Keyboard
     window.addEventListener('keydown', (ev) => {
