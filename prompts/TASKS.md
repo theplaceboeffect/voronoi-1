@@ -35,3 +35,6 @@ Generate app: index-gpt5.html
 
 # v00.00.05
 1. [M] verify the algoritm for deduping colors - make sure it makes as few changes as possible
+
+# v00.00.06
+1. [I] Allow the panel on the left to be collapsible. Create a hamburger menu on the top left. - Completed: 2025-08-18 19:17:37
