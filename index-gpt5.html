@@ -216,6 +216,7 @@
       fillMode: 'by-index',
       jitter: 0,
       paletteName: 'bright',
+      siteColorIdx: [],         // stable per-site color indices
     };
 
     // Canvas & sizing
@@ -339,10 +340,20 @@
       for (let i = 0; i < numSites; i++) {
         for (const nb of delaunay.neighbors(i)) { adj[i].add(nb); adj[nb].add(i); }
       }
+      // Try to preserve existing colors first
+      const seed = (state.siteColorIdx && state.siteColorIdx.length === numSites) ? state.siteColorIdx.slice() : new Array(numSites).fill(-1);
+      const colors = dsaturWithSeed(adj, paletteLen, seed);
+      // Resolve conflicts minimally if any remain
+      resolveConflicts(adj, colors, paletteLen, (typeof draggingIndex === 'number' ? draggingIndex : -1));
+      return colors;
+    }
+
+    function dsaturWithSeed(adj, paletteLen, seedColors) {
+      const n = adj.length;
       const degree = adj.map(s => s.size);
-      const colors = new Array(numSites).fill(-1);
-      const neighborColors = new Array(numSites).fill(0).map(() => new Set());
-      const uncolored = new Set(Array.from({length: numSites}, (_, i) => i));
+      const colors = new Array(n).fill(-1);
+      const neighborColors = new Array(n).fill(0).map(() => new Set());
+      const uncolored = new Set(Array.from({ length: n }, (_, i) => i));
       function pickVertex() {
         let best = -1, bestSat = -1, bestDeg = -1;
         for (const v of uncolored) {
@@ -355,12 +366,69 @@
         const v = pickVertex();
         const used = neighborColors[v];
         let cidx = -1;
-        for (let c = 0; c < paletteLen; c++) if (!used.has(c)) { cidx = c; break; }
-        if (cidx === -1) cidx = 0; // fallback if palette exhausted
+        const seed = seedColors[v];
+        if (seed != null && seed >= 0 && seed < paletteLen && !used.has(seed)) {
+          cidx = seed;
+        } else {
+          for (let c = 0; c < paletteLen; c++) if (!used.has(c)) { cidx = c; break; }
+          if (cidx === -1) cidx = 0;
+        }
         colors[v] = cidx; uncolored.delete(v);
         for (const nb of adj[v]) neighborColors[nb].add(cidx);
       }
       return colors;
+    }
+
+    function resolveConflicts(adj, colors, paletteLen, preferredIndex) {
+      const n = adj.length;
+      function hasConflict() {
+        for (let u = 0; u < n; u++) for (const v of adj[u]) if (u < v && colors[u] === colors[v]) return [u, v];
+        return null;
+      }
+      function recolorSingle(x) {
+        const used = new Set(); for (const nb of adj[x]) used.add(colors[nb]);
+        for (let c = 0; c < paletteLen; c++) if (!used.has(c)) { colors[x] = c; return true; }
+        return false;
+      }
+      function kempeSwap(u, v) {
+        const cu = colors[u];
+        for (let k = 0; k < paletteLen; k++) if (k !== cu) {
+          const queue = [u];
+          const visited = new Set([u]);
+          const inChain = new Set();
+          while (queue.length) {
+            const x = queue.shift();
+            inChain.add(x);
+            for (const nb of adj[x]) {
+              if (!visited.has(nb) && (colors[nb] === cu || colors[nb] === k)) { visited.add(nb); queue.push(nb); }
+            }
+          }
+          if (!inChain.has(v)) {
+            // swap cu <-> k in this component
+            for (const x of inChain) colors[x] = (colors[x] === cu ? k : cu);
+            return true;
+          }
+        }
+        return false;
+      }
+      let pair;
+      while ((pair = hasConflict())) {
+        let [u, v] = pair;
+        // Try to resolve with minimal changes
+        if (preferredIndex === v) [u, v] = [v, u];
+        if (preferredIndex !== -1 && preferredIndex !== u && preferredIndex !== v) {
+          // keep preferred stable if possible
+        }
+        if (recolorSingle(u)) continue;
+        if (recolorSingle(v)) continue;
+        if (kempeSwap(u, v)) continue;
+        // fallback: try recolor any neighbor with least degree
+        let bestW = -1, bestDeg = Infinity;
+        for (const w of adj[u]) { const d = adj[w].size; if (d < bestDeg) { bestDeg = d; bestW = w; } }
+        if (bestW !== -1 && recolorSingle(bestW)) continue;
+        // final fallback: expand palette virtually by rotating color of u
+        colors[u] = (colors[u] + 1) % paletteLen;
+      }
     }
 
     function draw() {
@@ -386,12 +454,12 @@
 
       // Cells (fills)
       if (state.showCells && state.fillMode !== 'none') {
-        let precomputedColorsIdx = null;
         let precomputedPalette = null;
         if (state.fillMode === 'distinct') {
           precomputedPalette = palettes[state.paletteName] || palettes.bright;
           if (!precomputedPalette || precomputedPalette.length === 0) precomputedPalette = palettes.bright;
-          precomputedColorsIdx = computeDistinctColoring(delaunay, state.points.length, precomputedPalette);
+          // Maintain stable colors with minimal changes
+          state.siteColorIdx = computeDistinctColoring(delaunay, state.points.length, precomputedPalette);
         }
         for (let i = 0; i < state.points.length; i++) {
           const cell = voronoi.cellPolygon(i);
@@ -408,7 +476,7 @@
             const hue = (i * 47) % 360;
             ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.20)`;
           } else if (state.fillMode === 'distinct') {
-            const ci = precomputedColorsIdx[i] % precomputedPalette.length;
+            const ci = (state.siteColorIdx[i] != null ? state.siteColorIdx[i] : 0) % precomputedPalette.length;
             ctx.fillStyle = hexToRgba(precomputedPalette[ci], 0.8);
           }
           ctx.fill();
@@ -439,8 +507,17 @@
 
       // Sites
       if (state.showSites) {
-        ctx.fillStyle = 'rgba(255, 184, 108, 0.95)';
-        for (const p of state.points) {
+        for (let i = 0; i < state.points.length; i++) {
+          const p = state.points[i];
+          let color = 'rgba(255, 184, 108, 0.95)';
+          if (draggingIndex === i) {
+            color = 'rgba(255, 153, 0, 0.95)';
+          } else if (state.fillMode === 'distinct') {
+            const palette = palettes[state.paletteName] || palettes.bright;
+            const ci = (state.siteColorIdx[i] != null ? state.siteColorIdx[i] : 0) % palette.length;
+            color = hexToRgba(palette[ci], 0.95);
+          }
+          ctx.fillStyle = color;
           ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
         }
       }
