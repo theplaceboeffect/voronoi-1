@@ -113,6 +113,12 @@
     .legend { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .chip { display: inline-flex; align-items: center; gap: 6px; }
     .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .palette-swatch { 
+      width: 20px; height: 20px; border-radius: 4px; display: inline-block; 
+      cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s ease;
+    }
+    .palette-swatch:hover { border-color: var(--accent); }
+    .palette-swatch.active { border-color: var(--accent-2); }
   </style>
   <script src="https://unpkg.com/d3-delaunay@6.0.4/dist/d3-delaunay.min.js"></script>
 </head>
@@ -121,7 +127,7 @@
     <header>
       <div style="display:flex; align-items:center; gap:10px;">
         <button id="btn-hamburger" class="hamburger" aria-label="Toggle panel"><span></span><span></span><span></span></button>
-        <h1>Voronoi Explorer</h1>
+        <h1>Voronoi Explorer v00.00.07</h1>
       </div>
       <div class="meta">
         Click to add points • Drag to move • Shift+Click deletes • Cmd/Ctrl+Z undo
@@ -170,9 +176,9 @@
         <div class="row">
           <label>Cell fill</label>
           <select id="fill-mode">
-            <option value="distinct">Distinct (palette)</option>
+            <option value="distinct" selected>Distinct (palette)</option>
             <option value="solid">Solid</option>
-            <option value="by-index" selected>By Index</option>
+            <option value="by-index">By Index</option>
             <option value="none">None</option>
           </select>
         </div>
@@ -189,7 +195,25 @@
             <option value="warm">Warm</option>
             <option value="cool">Cool</option>
             <option value="solarized">Solarized</option>
+            <option value="neon">Neon</option>
+            <option value="earth">Earth</option>
+            <option value="ocean">Ocean</option>
+            <option value="sunset">Sunset</option>
+            <option value="forest">Forest</option>
+            <option value="desert">Desert</option>
+            <option value="arctic">Arctic</option>
+            <option value="tropical">Tropical</option>
+            <option value="metallic">Metallic</option>
+            <option value="rainbow">Rainbow</option>
+            <option value="vintage">Vintage</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="minimal">Minimal</option>
+            <option value="retro">Retro</option>
+            <option value="jewel">Jewel</option>
           </select>
+        </div>
+        <div class="row">
+          <div id="palette-display" style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px;"></div>
         </div>
       </div>
 
@@ -227,9 +251,9 @@
       showEdges: true,
       showSites: true,
       showDelaunay: false,
-      fillMode: 'by-index',
+      fillMode: 'distinct',
       jitter: 0,
-      paletteName: 'bright',
+      paletteName: 'vivid',
       siteColorIdx: [],         // stable per-site color indices
     };
 
@@ -336,6 +360,21 @@
       warm:   ['#b71c1c','#e65100','#f9a825','#6d4c41','#d84315','#8d6e63','#c62828','#ff7043','#ff8f00','#795548'],
       cool:   ['#0d47a1','#00897b','#26a69a','#80cbc4','#5c6bc0','#1e88e5','#42a5f5','#90caf9','#00acc1','#4dd0e1'],
       solarized: ['#b58900','#cb4b16','#dc322f','#d33682','#6c71c4','#268bd2','#2aa198','#859900','#657b83','#839496'],
+      neon: ['#ff00ff','#00ffff','#ffff00','#ff0080','#80ff00','#0080ff','#ff8000','#8000ff','#00ff80','#ff0080'],
+      earth: ['#8b4513','#228b22','#4169e1','#ffd700','#dc143c','#9932cc','#ff6347','#32cd32','#ff69b4','#00ced1'],
+      ocean: ['#000080','#008080','#00bfff','#87ceeb','#4682b4','#1e90ff','#00ffff','#20b2aa','#48d1cc','#40e0d0'],
+      sunset: ['#ff4500','#ff6347','#ff7f50','#ff8c00','#ffa500','#ffd700','#ffff00','#ff69b4','#ff1493','#dc143c'],
+      forest: ['#228b22','#32cd32','#90ee90','#98fb98','#00ff00','#7cfc00','#adff2f','#9acd32','#6b8e23','#556b2f'],
+      desert: ['#f4a460','#deb887','#d2b48c','#cd853f','#daa520','#b8860b','#d2691e','#ff8c00','#ffa500','#ff6347'],
+      arctic: ['#f0f8ff','#e6e6fa','#b0c4de','#87ceeb','#add8e6','#f0ffff','#e0ffff','#f5f5dc','#faf0e6','#fff8dc'],
+      tropical: ['#ff1493','#ff69b4','#ffb6c1','#ffc0cb','#ff69b4','#ff1493','#dc143c','#ff4500','#ff6347','#ff7f50'],
+      metallic: ['#c0c0c0','#a9a9a9','#808080','#696969','#2f4f4f','#708090','#778899','#b0c4de','#87ceeb','#add8e6'],
+      rainbow: ['#ff0000','#ff7f00','#ffff00','#00ff00','#0000ff','#4b0082','#9400d3','#ff1493','#ff69b4','#ffb6c1'],
+      vintage: ['#8b4513','#a0522d','#cd853f','#deb887','#f5deb3','#ffe4b5','#ffefd5','#faf0e6','#fdf5e6','#fffacd'],
+      cyberpunk: ['#ff00ff','#00ffff','#ffff00','#ff0080','#80ff00','#0080ff','#ff8000','#8000ff','#00ff80','#ff0080'],
+      minimal: ['#000000','#ffffff','#808080','#c0c0c0','#404040','#a0a0a0','#606060','#e0e0e0','#202020','#909090'],
+      retro: ['#ff6b6b','#4ecdc4','#45b7d1','#96ceb4','#ffeaa7','#dda0dd','#98d8c8','#f7dc6f','#bb8fce','#85c1e9'],
+      jewel: ['#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff','#ffa500','#800080','#008000','#000080']
     };
 
     function hexToRgba(hex, alpha) {
@@ -671,8 +710,14 @@
     $('show-delaunay').addEventListener('change', (e) => { state.showDelaunay = e.target.checked; draw(); });
     $('fill-mode').addEventListener('change', (e) => { state.fillMode = e.target.value; draw(); });
     const paletteSelect = document.getElementById('palette-select');
-    try { paletteSelect.value = (localStorage.getItem('voronoi-palette') || state.paletteName); } catch {}
-    state.paletteName = paletteSelect.value;
+    try { 
+      const savedPalette = localStorage.getItem('voronoi-palette');
+      paletteSelect.value = savedPalette || 'vivid';
+      state.paletteName = paletteSelect.value;
+    } catch {
+      paletteSelect.value = 'vivid';
+      state.paletteName = 'vivid';
+    }
     paletteSelect.addEventListener('change', () => {
       state.paletteName = paletteSelect.value;
       try { localStorage.setItem('voronoi-palette', state.paletteName); } catch {}
@@ -682,8 +727,67 @@
         state.fillMode = 'distinct';
         if (fillModeEl) fillModeEl.value = 'distinct';
       }
+      updatePaletteDisplay();
       draw();
     });
+
+    // Palette display and interaction
+    let clickedColorIndex = -1;
+    let originalPaletteColors = [];
+
+    function updatePaletteDisplay() {
+      const paletteDisplay = document.getElementById('palette-display');
+      const palette = palettes[state.paletteName] || palettes.vivid;
+      
+      paletteDisplay.innerHTML = '';
+      palette.forEach((color, index) => {
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-swatch';
+        swatch.style.backgroundColor = color;
+        swatch.dataset.index = index;
+        swatch.dataset.color = color;
+        
+        swatch.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          clickedColorIndex = index;
+          originalPaletteColors = [...palette];
+          
+          // Set the color to black in the palette display
+          swatch.style.backgroundColor = '#000000';
+          
+          // Set the color to black in the canvas
+          const tempPalette = [...palette];
+          tempPalette[index] = '#000000';
+          palettes[state.paletteName] = tempPalette;
+          draw();
+        });
+        
+        swatch.addEventListener('mouseup', () => {
+          if (clickedColorIndex === index) {
+            // Revert the color back
+            swatch.style.backgroundColor = originalPaletteColors[index];
+            palettes[state.paletteName] = originalPaletteColors;
+            clickedColorIndex = -1;
+            draw();
+          }
+        });
+        
+        swatch.addEventListener('mouseleave', () => {
+          if (clickedColorIndex === index) {
+            // Revert the color back
+            swatch.style.backgroundColor = originalPaletteColors[index];
+            palettes[state.paletteName] = originalPaletteColors;
+            clickedColorIndex = -1;
+            draw();
+          }
+        });
+        
+        paletteDisplay.appendChild(swatch);
+      });
+    }
+
+    // Initialize palette display
+    updatePaletteDisplay();
 
     // Export / Import
     $('btn-export').addEventListener('click', () => {
