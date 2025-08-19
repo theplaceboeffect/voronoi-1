@@ -38,3 +38,12 @@ Generate app: index-gpt5.html
 
 # v00.00.06
 1. [I] Allow the panel on the left to be collapsible. Create a hamburger menu on the top left. - Completed: 2025-08-18 19:17:37
+
+# v00.00.07
+1. [R] Add more pallets up to 20.
+1. [R] Recolor after any change in palette.
+1. [R] When user clicks on a color in the palette:
+      - set the color on the pallete to black
+      - set the color used in the canvas to black
+      - revert the color back when the mouse button is released.
+1. [R] When the screen loads, set the colors to the Vivid palette
