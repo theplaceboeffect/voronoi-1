@@ -9,7 +9,6 @@
   - [I] used by AI to indicate the task is implemented. Mark the task with the completion timestamp.
   - [X] task has been verified by human.
 
-
 ## PROMPT
 ```
 Review TASKS.md and execute all tasks marked 'R' per the INSTRUCTIONS.
@@ -47,4 +46,8 @@ Generate app: index-gpt5.html
       - set the color used in the canvas to black
       - revert the color back when the mouse button is released. - Completed: 2025-01-27 15:30:00
 1. [I] When the screen loads, set the colors to the Vivid palette - Completed: 2025-01-27 15:30:00
-1. [I] Add a version after the application title. - Completed: 2025-01-27 15:30:00
+1. [I] Add a version after qthe application title. - Completed: 2025-01-27 15:30:00
+
+# v00.00.08
+1. [I] Only show 4 colors in the palette. - Completed: 2025-01-27 15:45:00
+1. [I] When displaying the Delaunay Triangulation, make the points either black or white to contrast with the chosen palette. - Completed: 2025-01-27 15:45:00
